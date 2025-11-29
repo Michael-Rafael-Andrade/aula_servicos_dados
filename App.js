@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 
-const API_URL = 'http://localhost:3000/items'; // Criar uma url para indicar onde está puxando o json
+// const API_URL = 'http://localhost:3000/items'; // Criar uma url para indicar onde está puxando o json
+const API_URL = 'http://127.0.0.1:3000/items'; // Criar uma url para indicar onde está puxando o json
 
 export default function App() {
   const [items, setItems] = useState([]); // lista de itens
@@ -20,19 +21,66 @@ export default function App() {
       const data = await response.json();
       setItems(data);
     }
-    catch(error){
+    catch (error) {
       console.error('Erro ao buscar itens: ', error);
       Alert.alert('Erro', 'Não foi possível carregar os dados.');
     }
-    finally{
+    finally {
       setLoading(false);
     }
   }
 
+  const handleAdd = async () => {
+    if (!text.trim()) return Alert.alert('Digite algo');  // tirar todos os espaços e pedir o usuário para digitar algo
+
+    try {
+      if (editId) {
+        await fetch(`${API_URL}/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editId, name: text }),
+        }); // localhost/items
+        setEditId(null);
+      } // Verificar se tem o id ou não
+      else {
+        // 🆕 LINHA 81: Calcula o maior ID numérico, usando 0 se a lista estiver vazia
+        const maxId = Math.max(0, ...items.map(item => Number(item.id)));
+
+        // 🆕 LINHA 82: Define o próximo ID
+        const newId = maxId + 1;
+        await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-type': 'application/json' },
+          body: JSON.stringify({ id: newId, name: text }),
+        });
+      }
+      setText('');
+      fetchItems();
+    }
+    catch (error) {
+      console.error('Error ao adicionar/editar: ', error);
+    }
+  };
+
+  const handleEdit = (item) => {
+    setEditId(item.id);
+    setText(item.name);
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+      fetchItems();
+    }
+    catch (error) {
+      console.error('Erro ao exlcluir item: ', error)
+    }
+  };
+
   if (loading) {  // Se estiver carregando alguma coisa
     return ( // carregando os dados exiba uma informação para o cliente que os dados estão sendo carregados
       <View style={styles.center}>
-        <ActivityIndicator size="large" /> 
+        <ActivityIndicator size="large" />
         <Text>Carregando dados...</Text>
       </View>
     );
@@ -49,9 +97,26 @@ export default function App() {
           value={text}
           onChangeText={setText}
         />
-        <Button title={editId ? 'Salvar' : 'Adicionar'} onPress={null} />
+        <Button title={editId ? 'Salvar' : 'Adicionar'} onPress={handleAdd} />
       </View>
 
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.item}>
+            <Text style={styles.itemText}>{item.name}</Text>
+            <View style={styles.buttons}>
+              <TouchableOpacity onPress={() => handleEdit(item)}>
+                <Text style={styles.edit}>Editar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(item.id)} >
+                <Text style={styles.delete}>Excluir</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      />
     </View>
   );
 }
